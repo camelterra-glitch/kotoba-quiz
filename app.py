@@ -87,19 +87,18 @@ def reset():
     st.session_state.screen = "top"
 
 def render_hint(q: dict):
-    """フリガナ付きヒントを表示する（hint_ruby があればそちらを優先）"""
+    """フリガナ付きヒントを表示する"""
     hint_html = q.get("hint_ruby") or q["hint"]
     st.markdown(
-        f"""
-        <div style='
-            font-size: 1.3rem;
-            font-weight: bold;
-            line-height: 2.5;
-            padding: 0.5rem 0;
-        '>{hint_html}</div>
-        """,
+        f"<div style='font-size:1.3rem; font-weight:bold; line-height:2.5; padding:0.5rem 0'>"
+        f"{hint_html}</div>",
         unsafe_allow_html=True,
     )
+
+def get_choice_label(q: dict, choice: str) -> str:
+    """選択肢の表示ラベルを返す（フリガナがあれば付ける）"""
+    choices_ruby = q.get("choices_ruby", {})
+    return choices_ruby.get(choice, choice)
 
 # ──────────────────────────────────────────
 # 画面1: トップ画面
@@ -121,14 +120,18 @@ def show_quiz():
     total = len(st.session_state.questions)
     current_idx = st.session_state.current
 
-    # ── 進捗バー・ヘッダー ──
+    # ── 進捗バー・ヘッダー（「最初にもどる」ボタンを右端に配置）──
     st.progress(current_idx / total)
-    col_l, col_r = st.columns([3, 1])
+    col_l, col_m, col_r = st.columns([3, 1, 1])
     with col_l:
         st.write(f"**もんだい {current_idx + 1} / {total}**　"
                  f"レベル：{LEVEL_LABELS[st.session_state.level]}")
-    with col_r:
+    with col_m:
         st.write(f"✅ {st.session_state.score}もん せいかい")
+    with col_r:
+        if st.button("🏠 もどる", use_container_width=True, key="back_to_top"):
+            reset()
+            st.rerun()
 
     st.markdown("---")
 
@@ -146,15 +149,16 @@ def show_quiz():
     # ── 選択肢ボタン ──
     answered = st.session_state.answered
     for choice in st.session_state.shuffled_choices:
+        choice_label = get_choice_label(q, choice)
         if answered:
             if choice == q["answer"]:
-                st.success(f"⭕ {choice}")
+                st.success(f"⭕ {choice_label}")
             elif choice == st.session_state.answers[-1]["selected"] and not st.session_state.last_correct:
-                st.error(f"❌ {choice}")
+                st.error(f"❌ {choice_label}")
             else:
-                st.button(choice, disabled=True, key=f"choice_{choice}", use_container_width=True)
+                st.button(choice_label, disabled=True, key=f"choice_{choice}", use_container_width=True)
         else:
-            if st.button(choice, key=f"choice_{choice}", use_container_width=True):
+            if st.button(choice_label, key=f"choice_{choice}", use_container_width=True):
                 answer(choice)
                 st.rerun()
 
@@ -164,7 +168,8 @@ def show_quiz():
         if st.session_state.last_correct:
             st.markdown("## 🎉 せいかい！")
         else:
-            st.markdown(f"## 😢 ざんねん…　こたえは **{q['answer']}** だよ！")
+            correct_label = get_choice_label(q, q["answer"])
+            st.markdown(f"## 😢 ざんねん…　こたえは **{correct_label}** だよ！")
 
         label = "つぎの もんだいへ →" if current_idx + 1 < total else "けっかを みる 🏁"
         if st.button(label, use_container_width=True, type="primary"):
@@ -202,8 +207,10 @@ def show_result():
             if q["emoji"]:
                 st.write(q["emoji"])
             render_hint(q)
-            st.write(f"**あなたの こたえ：** {rec['selected']}")
-            st.write(f"**せいかい：** {q['answer']}")
+            selected_label = get_choice_label(q, rec["selected"])
+            correct_label  = get_choice_label(q, q["answer"])
+            st.write(f"**あなたの こたえ：** {selected_label}")
+            st.write(f"**せいかい：** {correct_label}")
 
     st.markdown("---")
     col1, col2 = st.columns(2)
